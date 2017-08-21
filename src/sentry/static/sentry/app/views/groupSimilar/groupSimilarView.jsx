@@ -138,7 +138,6 @@ const GroupSimilarView = React.createClass({
             groupId={groupId}
             pageLinks={this.state.similarLinks}
           />}
-
       </div>
     );
   }
