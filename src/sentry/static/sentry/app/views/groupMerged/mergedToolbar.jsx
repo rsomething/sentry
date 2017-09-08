@@ -4,7 +4,8 @@ import Reflux from 'reflux';
 
 import {t} from '../../locale';
 import GroupingStore from '../../stores/groupingStore';
-
+import ProjectActions from '../../actions/projectActions';
+import Button from '../../components/buttons/button';
 import LinkWithConfirmation from '../../components/linkWithConfirmation';
 import Toolbar from '../../components/toolbar';
 import SpreadLayout from '../../components/spreadLayout';
@@ -12,48 +13,97 @@ import SpreadLayout from '../../components/spreadLayout';
 const MergedToolbar = React.createClass({
   propTypes: {
     onUnmerge: PropTypes.func,
-    onCollapse: PropTypes.func
+    groupId: PropTypes.string,
+    onToggleCollapse: PropTypes.func
   },
 
   mixins: [Reflux.listenTo(GroupingStore, 'onGroupingUpdate')],
+
   getInitialState() {
+    let {
+      unmergeList,
+      unmergeLastCollapsed,
+      unmergeDisabled,
+      enableFingerprintCompare
+    } = GroupingStore;
+
     return {
-      unmergeCount: 0
+      enableFingerprintCompare,
+      unmergeList,
+      unmergeLastCollapsed,
+      unmergeDisabled
     };
   },
 
-  onGroupingUpdate({unmergeList}) {
-    if (unmergeList && unmergeList.size !== this.state.unmergedCount) {
-      this.setState({
-        unmergeCount: unmergeList.size
-      });
-    }
+  onGroupingUpdate(updateObj) {
+    let allowedKeys = [
+      'unmergeLastCollapsed',
+      'unmergeDisabled',
+      'unmergeList',
+      'enableFingerprintCompare'
+    ];
+
+    Object.keys(updateObj).filter(key => allowedKeys.indexOf(key) > -1).forEach(key => {
+      if (typeof updateObj[key] !== 'undefined') {
+        this.setState({
+          [key]: updateObj[key]
+        });
+      }
+    });
+  },
+
+  handleShowDiff(e) {
+    let {groupId} = this.props;
+    let [baseEventId, targetEventId] = Array.from(this.state.unmergeList.values()).map(
+      ([, eventId]) => eventId
+    );
+    ProjectActions.openDiffModal({
+      baseIssueId: groupId,
+      targetIssueId: groupId,
+      baseEventId,
+      targetEventId
+    });
+
+    e.stopPropagation();
   },
 
   render() {
-    let {onUnmerge, onCollapse} = this.props;
+    let {onUnmerge, onToggleCollapse} = this.props;
+    let unmergeCount = (this.state.unmergeList && this.state.unmergeList.size) || 0;
+
     return (
       <Toolbar className="merged-toolbar">
         <SpreadLayout responsive>
           <SpreadLayout>
             <div className="merged-toolbar-actions">
               <LinkWithConfirmation
-                disabled={this.state.unmergeCount === 0}
-                title={t(`Unmerging ${this.state.unmergeCount} events`)}
+                disabled={this.state.unmergeDisabled}
+                title={t(`Unmerging ${unmergeCount} events`)}
                 message={t(
                   'These events will be unmerged and grouped into a new issue. Are you sure you want to unmerge these events?'
                 )}
                 className="btn btn-sm btn-default"
                 onConfirm={onUnmerge}>
-                {t('Unmerge')} ({this.state.unmergeCount || 0})
+                {t('Unmerge')} ({unmergeCount || 0})
               </LinkWithConfirmation>
+
+              <Button
+                style={{marginLeft: 10}}
+                size="small"
+                disabled={!this.state.enableFingerprintCompare}
+                onClick={this.handleShowDiff}>
+                {t('Compare')}
+              </Button>
             </div>
           </SpreadLayout>
           <SpreadLayout>
             <div>
-              <button className="btn btn-sm btn-default" onClick={onCollapse}>
-                Collapse All
-              </button>
+              <Button
+                className="toggle-collapse-all"
+                size="small"
+                onClick={onToggleCollapse}>
+                {this.state.unmergeLastCollapsed ? t('Expand All') : t('Collapse All')}
+              </Button>
             </div>
           </SpreadLayout>
         </SpreadLayout>
